@@ -15,3 +15,5 @@ const Note = ({ title, description, color, onDelete, onEdit }) => {
 };
 
 export default Note;
+
+

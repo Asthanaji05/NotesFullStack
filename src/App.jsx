@@ -1,107 +1,106 @@
+// importing files
+
 import { useState, useEffect } from 'react';
+// Axios ek js library hai jo browser aur Node.js environment mein HTTP requests ko bhejne aur responses ko handle karne mein use hoti hai.
+//Axios primarily client-side (browser) mein kaam karta hai jabki Express server-side (Node.js) environment me
+//Axios se aap server se data retrieve kar sakte hain client-side par, 
+//jabki Express se aap server-side logic execute kar sakte hain jaise ki database se data retrieve karna, usko process karna, aur client ko response bhejna.
+
+
+import axios from 'axios';
 import './App.css';
 import Note from './Note';
 
-function App() {
-  const [count, setCount] = useState(0);
-  const [title, setTitle] = useState("");
-  const [note, setNote] = useState("");
-  const [color, setColor] = useState("#ffffff");
- 
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [filterColor, setFilterColor] = useState("");
+//API_url for getting data from server.js
+const API_URL = 'http://localhost:5000/notes';
 
- const [listobj, setListobj] = useState(() => {
-  // Initialize state from localStorage if available
-  try {
-    const storedNotes = window.localStorage.getItem("notes");
-    return storedNotes ? JSON.parse(storedNotes) : [];
-  } catch (error) {
-    console.error("Error parsing notes from localStorage during initialization", error);
-    return [];
-  }
-});
+
+//main App() function
+function App() {
+  //useStates for different functionalities
+  const [count, setCount] = useState(0); //store count of notes
+  const [title, setTitle] = useState(""); //title entered
+  const [note, setNote] = useState(""); //note description entered
+  const [color, setColor] = useState("#ffffff"); //color selected
+  const [editingIndex, setEditingIndex] = useState(null);  //which note is editing 
+  const [filterColor, setFilterColor] = useState(""); //setting filter based on color
+  const [listobj, setListobj] = useState([]); //list of notes
+
+  // useEffect for reloading for first time []
   useEffect(() => {
-    try {
-      const storedNotes = window.localStorage.getItem("notes");
-      if (storedNotes) {
-        const parsedNotes = JSON.parse(storedNotes);
-        setListobj(parsedNotes);
-        setCount(parsedNotes.length);
-        console.log("Get Item" + listobj);
-      }
-    } catch (error) {
-      console.error("Error loading notes from localStorage", error);
-    }
+    axios.get(API_URL)
+      .then(response => {
+        setListobj(response.data); //adding data in list
+        setCount(response.data.length); //updating count
+      })
+      .catch(error => console.error("Error fetching notes:", error));
   }, []);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("notes", JSON.stringify(listobj));
-      console.log("Set Item" + listobj);
-    } catch (error) {
-      console.error("Error saving notes to localStorage", error);
-    }
-  }, [listobj]);
+  // function for adding Note
 
   function handleAddNote() {
+    //checking if title and note is not empty
     if (title.trim() === "" || note.trim() === "") {
       alert("Please enter both a title and a note.");
       return;
     }
-
+     // create a newNote
     const newNote = { title, description: note, color };
 
-    let updatedList;
     if (editingIndex !== null) {
-      updatedList = listobj.map((item, index) =>
-        index === editingIndex ? newNote : item
-      );
-      setEditingIndex(null);
-      console.log("Updated Item" + listobj);
+      axios.put(`${API_URL}/${editingIndex}`, newNote)
+        .then(response => {
+          const updatedList = listobj.map((item) =>
+            item._id === editingIndex ? response.data : item
+          );
+          setListobj(updatedList);
+          setEditingIndex(null);
+        })
+        .catch(error => console.error("Error updating note:", error));
     } else {
-      updatedList = [...listobj, newNote];
+      axios.post(API_URL, newNote)
+        .then(response => {
+          setListobj([...listobj, response.data]);
+        })
+        .catch(error => console.error("Error adding note:", error));
     }
 
-    setListobj(updatedList);
-    setCount(updatedList.length);
-
+    setCount(listobj.length + 1);
     setTitle("");
     setNote("");
     setColor("#ffffff");
-
-    console.log("New note added/edited:", newNote);
-    console.log("Updated list of notes:", updatedList);
   }
 
-  function handleDeleteNote(index) {
-    const updatedList = listobj.filter((_, i) => i !== index);
-    setListobj(updatedList);
-    setCount(updatedList.length);
-
-    console.log("Note deleted:", index);
-    console.log("Updated list of notes:", updatedList);
+  function handleDeleteNote(id) {
+    axios.delete(`${API_URL}/${id}`)
+      .then(() => {
+        const updatedList = listobj.filter(item => item._id !== id);
+        setListobj(updatedList);
+        setCount(updatedList.length);
+      })
+      .catch(error => console.error("Error deleting note:", error));
   }
-
-  function handleEditNote(index) {
-    const noteToEdit = listobj[index];
+  //for editing and updating note
+  //_id MongoDB mein har document ka unique identifier hota hai jo React application mein har note ko uniquely identify karne ke liye use hota hai.
+  function handleEditNote(id) {
+    const noteToEdit = listobj.find(item => item._id === id);
     setTitle(noteToEdit.title);
     setNote(noteToEdit.description);
     setColor(noteToEdit.color);
-    setEditingIndex(index);
-
-    console.log("Editing note:", index);
+    setEditingIndex(id);
   }
-
+   //filtered notes based on color
   const filteredNotes = filterColor
     ? listobj.filter((note) => note.color === filterColor)
     : listobj;
-    const colorOptions = [
-      "#cfbaf0", "#90dbf4", "#8eecf5", "#b9fbc0", "#fdffb6", "#ffcfd2", "#FFCFE4"
-    ];
+  //Color Options 
+  const colorOptions = [
+    "#cfbaf0", "#90dbf4", "#8eecf5", "#b9fbc0", "#fdffb6", "#ffcfd2", "#FFCFE4"
+  ];
+   // returning html 
   return (
     <>
-      <h1>React-based Notes Application</h1>
+      <h1>React-based Notes Application</h1> 
       <h4>You have currently, {count} notes</h4>
       <div id='container'>
         <div className='ip'>
@@ -125,59 +124,53 @@ function App() {
           />
         </div>
         <div className='ip'>
-  <div className="color-options">
-    {colorOptions.map((colorOption) => (
-      <label key={colorOption} style={{ backgroundColor: colorOption }} className="color-circle"
-      id={color === colorOption ? "selected" : ""}>
-        <input
-          type="radio"
-          name="color"
-          value={colorOption}
-          checked={color === colorOption}
-          onChange={() => setColor(colorOption)}
-        />
-        <span  style={{ backgroundColor: colorOption }}></span>
-      </label>
-    ))}
-  </div>
-</div>
-
-
+          <div className="color-options">
+            {colorOptions.map((colorOption) => (
+              <label key={colorOption} style={{ backgroundColor: colorOption }} className="color-circle"
+              id={color === colorOption ? "selected" : ""}>
+                <input
+                  type="radio"
+                  name="color"
+                  value={colorOption}
+                  checked={color === colorOption}
+                  onChange={() => setColor(colorOption)}
+                />
+                <span  style={{ backgroundColor: colorOption }}></span>
+              </label>
+            ))}
+          </div>
+        </div>
         <button className='button' onClick={handleAddNote}>
           {editingIndex !== null ? "Update Note" : "Create New"}
         </button>
       </div>
-
       <div className='filter'>
-  <h3>Filter by color:</h3>
-  <div className="color-options">
-    <label>
-      <input
-        type="radio"
-        name="filterColor"
-        value=""
-        checked={filterColor === ""}
-        onChange={() => setFilterColor("")}
-      />
-      <span className="color-circle"  style={{ backgroundColor: '#ffffff' }} id={filterColor === "" ? "selectall" : "all"}>All</span>
-    </label>
-    {colorOptions.map((colorOption) => (
-      <label key={colorOption} style={{ backgroundColor: colorOption }} className="color-circle" id={filterColor === colorOption ? "selected" : ""}>
-        <input
-          type="radio"
-          name="filterColor"
-          value={colorOption}
-          checked={filterColor === colorOption}
-          onChange={() => setFilterColor(colorOption)}
-        />
-        <span  style={{ backgroundColor: colorOption }}></span>
-      </label>
-    ))}
-  </div>
-</div>
-
-
-
+        <h3>Filter by color:</h3>
+        <div className="color-options">
+          <label>
+            <input
+              type="radio"
+              name="filterColor"
+              value=""
+              checked={filterColor === ""}
+              onChange={() => setFilterColor("")}
+            />
+            <span className="color-circle"  style={{ backgroundColor: '#ffffff' }} id={filterColor === "" ? "selectall" : "all"}>All</span>
+          </label>
+          {colorOptions.map((colorOption) => (
+            <label key={colorOption} style={{ backgroundColor: colorOption }} className="color-circle" id={filterColor === colorOption ? "selected" : ""}>
+              <input
+                type="radio"
+                name="filterColor"
+                value={colorOption}
+                checked={filterColor === colorOption}
+                onChange={() => setFilterColor(colorOption)}
+              />
+              <span  style={{ backgroundColor: colorOption }}></span>
+            </label>
+          ))}
+        </div>
+      </div>
       <div className='cardcontainer'>
         {filteredNotes.map((item, index) => (
           <Note
@@ -185,8 +178,8 @@ function App() {
             title={item.title}
             description={item.description}
             color={item.color}
-            onDelete={() => handleDeleteNote(index)}
-            onEdit={() => handleEditNote(index)}
+            onDelete={() => handleDeleteNote(item._id)}
+            onEdit={() => handleEditNote(item._id)}
           />
         ))}
       </div>
